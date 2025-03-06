@@ -6,13 +6,12 @@ import torch
 import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
 
-from torchvision.datasets import CIFAR10
+from torchvision.datasets import ImageFolder
 from torchvision import transforms
 from torchvision.utils import save_image, make_grid
 
 from mindiffusion.unet import NaiveUnet
 from mindiffusion.ddpm import DDPM
-import time
 
 
 class Half:
@@ -21,35 +20,32 @@ class Half:
         image_tensor = transforms.ToTensor()(image)
         
         # half size: MNIST->14, CIFAR10->16
-        half = image_tensor[:, 16:, :] 
+        half = image_tensor[:, 32:, :] 
         # print(right_half.size())
         return half
 
-def train_cifar10(
+def train_tinyimagenet(
     n_epoch: int = 100, device: str = "cuda:0", load_pth: Optional[str] = None
 ) -> None:
 
     ddpm = DDPM(eps_model=NaiveUnet(3, 3, n_feat=128), betas=(1e-4, 0.02), n_T=1000)
     if load_pth is not None:
-        ddpm.load_state_dict(torch.load("ddpm_cifar.pth"))
+        ddpm.load_state_dict(torch.load("ddpm_tinyimagenet.pth"))
 
     ddpm.to(device)
 
     tf = transforms.Compose(
-        [Half(), transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))]
+        [Half(), transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))]
     )
 
-    dataset = CIFAR10(
-        "./data",
-        train=True,
-        download=True,
+    dataset = ImageFolder(
+        "~/.torchtiny-imagenet-200/train",
         transform=tf,
     )
 
     dataloader = DataLoader(dataset, batch_size=512, shuffle=True, num_workers=16)
     optim = torch.optim.Adam(ddpm.parameters(), lr=1e-5)
 
-    start_time = time.time()
     for i in range(n_epoch):
         print(f"Epoch {i} : ")
         ddpm.train()
@@ -77,8 +73,7 @@ def train_cifar10(
 
             # save model
             torch.save(ddpm.state_dict(), f"./ddpm_cifar.pth")
-    stop_time = time.time()
-    print(f"Total time: {stop_time - start_time}")
+
 
 if __name__ == "__main__":
-    train_cifar10()
+    train_tinyimagenet()

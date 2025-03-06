@@ -59,17 +59,6 @@ class DummyEpsModel(nn.Module):
     def __init__(self, n_channel: int) -> None:
         super(DummyEpsModel, self).__init__()
         self.conv = nn.Sequential(  # with batchnorm
-            # # down sampling
-            # blk(n_channel, 3),
-            # blk(3, 8),
-            # blk(8, 16),
-
-            # # # up sampling
-            # blk(16, 8),
-            # blk(8, 3),
-            # nn.Conv2d(3, n_channel, 3, padding=1),
-
-            # old
             # down sampling
             blk(n_channel, 32),
             blk(32, 64),
@@ -84,7 +73,6 @@ class DummyEpsModel(nn.Module):
         )
 
     def forward(self, x, t) -> torch.Tensor:
-        # Lets think about using t later. In the paper, they used Tr-like positional embeddings.
         return self.conv(x)
 class DDPM(nn.Module):
     def __init__(
@@ -145,38 +133,25 @@ class Half:
         image_tensor = transforms.ToTensor()(image)
         
         # half size: MNIST->14, CIFAR10->16
-        half = image_tensor[:, 14:, :] 
+        half = image_tensor[:, 16:, :] 
         # print(right_half.size())
         return half
 
 
 def train_mnist(n_epoch: int = 200, device="cuda:0") -> None:
 
-    ddpm = DDPM(eps_model=DummyEpsModel(1), betas=(1e-4, 0.02), n_T=1000)
+    ddpm = DDPM(eps_model=DummyEpsModel(3), betas=(1e-4, 0.02), n_T=1000)
     ddpm.to(device)
-    
-    # # mnist
-    # tf = transforms.Compose(
-    #     [Half(), transforms.Normalize((0.1307,), (0.3081))]
-    # )
-    # dataset = MNIST(
-    #     "./data",
-    #     train=True,
-    #     download=True,
-    #     transform=tf,
-    # )
-
-    # fmnist
     tf = transforms.Compose(
-        [Half(), transforms.Normalize((0.2860,), (0.3530))]
+        [Half(), transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))]
     )
-    dataset = FashionMNIST(
+
+    dataset = CIFAR10(
         "./data",
         train=True,
         download=True,
         transform=tf,
     )
-
     dataloader = DataLoader(dataset, batch_size=128, shuffle=True, num_workers=20)
     optim = torch.optim.Adam(ddpm.parameters(), lr=2e-4)
 
@@ -208,7 +183,7 @@ def train_mnist(n_epoch: int = 200, device="cuda:0") -> None:
 
             # save model
             # torch.save(ddpm.state_dict(), f"./ddpm_cifar.pth")
-            torch.save(ddpm.state_dict(), f"./ddpm_fmnist_100_32.pth")
+            torch.save(ddpm.state_dict(), f"./ddpm_cifar10_simple.pth")
 
     stop_time = time.time()
     print(f"Total time: {stop_time - start_time}")
